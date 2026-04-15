@@ -42,15 +42,16 @@ Activate it:
 pip install -r requirements.txt
 ```
 
-### 3. Add your data
+### 3. Get the data
 
-Place the Superstore CSV file in `data/raw/`.
+The `data/` folder is not included in this repo.
+Download the CSV from Kaggle and place it in `data/raw/`:
 
-### 4. Configure environment variables (optional)
+1. Go to https://www.kaggle.com/datasets/vivek468/superstore-dataset-final
+2. Click **Download** and save the file.
+3. Copy `Sample - Superstore.csv` into the `data/raw/` folder.
 
-Copy `.env.example` to `.env` and adjust paths or model names as needed.
-
-### 5. Launch the notebook
+### 4. Launch the notebook
 
 ```bash
 jupyter notebook notebooks/01_exploration.ipynb
