@@ -1,0 +1,10 @@
+pandas
+numpy
+matplotlib
+seaborn
+jupyter
+sentence-transformers
+chromadb
+langchain
+langchain-community
+python-dotenv
