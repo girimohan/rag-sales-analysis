@@ -7,7 +7,7 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("🛒 Superstore RAG Assistant")
+st.title("Superstore RAG Assistant")
 st.markdown(
     "Ask any question about sales, customers, products, or regions "
     "and get an answer based on the Superstore dataset."
@@ -27,22 +27,26 @@ if submitted:
     if not question:
         st.warning("Please enter a question.")
     else:
-        with st.spinner("Thinking..."):
-            try:
-                response = requests.post(
-                    "http://localhost:8000/ask",
+        st.divider()
+        st.subheader("Answer")
+        try:
+            def token_stream():
+                with requests.post(
+                    "http://localhost:8000/ask/stream",
                     json={"query": question},
+                    stream=True,
                     timeout=120,
-                )
-                response.raise_for_status()
-                answer = response.json().get("answer", "No answer returned.")
-                st.divider()
-                st.subheader("Answer")
-                st.write(answer)
-            except requests.exceptions.ConnectionError:
-                st.error("Cannot reach the backend. Make sure the FastAPI server is running on port 8000.")
-            except requests.exceptions.RequestException as e:
-                st.error(f"Request failed: {e}")
+                ) as r:
+                    r.raise_for_status()
+                    for chunk in r.iter_content(chunk_size=None, decode_unicode=True):
+                        if chunk:
+                            yield chunk
+
+            st.write_stream(token_stream())
+        except requests.exceptions.ConnectionError:
+            st.error("Cannot reach the backend. Make sure the FastAPI server is running on port 8000.")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Request failed: {e}")
 
 st.divider()
-st.caption("Powered by ChromaDB · SentenceTransformers · Ollama (llama3)")
+st.caption("Powered by ChromaDB · SentenceTransformers · Ollama (phi3:mini)")
