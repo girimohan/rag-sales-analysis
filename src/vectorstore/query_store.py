@@ -14,7 +14,7 @@ def query_vector_store(query: str, collection_name: str = "superstore", top_k: i
     client = chromadb.PersistentClient(path="chroma_db")
     collection = client.get_collection(name=collection_name)
 
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    model = SentenceTransformer("all-MiniLM-L6-v2", device="cuda")
     query_embedding = model.encode(query).tolist()
 
     results = collection.query(query_embeddings=[query_embedding], n_results=top_k)

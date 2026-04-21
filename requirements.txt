@@ -3,8 +3,27 @@ numpy
 matplotlib
 seaborn
 jupyter
+notebook
+python-dotenv
+
+# Embeddings
 sentence-transformers
+
+# Vector DB
 chromadb
+
+# RAG Framework
 langchain
 langchain-community
-python-dotenv
+
+# LLMs
+ollama
+
+# API & UI
+fastapi
+uvicorn[standard]
+streamlit
+
+# Utilities
+tqdm
+scikit-learn
