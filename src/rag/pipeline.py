@@ -10,7 +10,7 @@ def build_context(docs: List[str]) -> str:
     return "\n\n".join(docs)
 
 
-def run_rag(query: str, top_k: int = 5) -> str:
+def run_rag(query: str, top_k: int = 20) -> str:
     """Retrieve relevant documents and return a local model answer for the query.
 
     Queries the vector store, builds a context string, fills the prompt
