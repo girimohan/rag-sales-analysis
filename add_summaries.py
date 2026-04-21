@@ -24,7 +24,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     df["order_date"] = pd.to_datetime(df["order_date"], dayfirst=False, errors="coerce")
     df["year"] = df["order_date"].dt.year
 
-    # ── 1. Profit by Region (all time) ────────────────────────────────────────
+    # 1. Profit by Region (all time)
     r = df.groupby("region").agg(
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
@@ -40,7 +40,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     lines.append(f"Highest-profit region overall: {top_region}.")
     docs.append({"id": "summary_profit_by_region", "text": "\n".join(lines)})
 
-    # ── 2. Profit by Region per Year ──────────────────────────────────────────
+    # 2. Profit by Region per Year
     ry = df.groupby(["year", "region"])["profit"].sum().round(2).reset_index()
     for yr, grp in ry.groupby("year"):
         top = grp.loc[grp["profit"].idxmax(), "region"]
@@ -50,7 +50,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         lines.append(f"Highest-profit region in {yr}: {top}.")
         docs.append({"id": f"summary_region_profit_{yr}", "text": "\n".join(lines)})
 
-    # ── 3. Profit by Category (all time) ──────────────────────────────────────
+    # 3. Profit by Category (all time)
     ca = df.groupby("category").agg(
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
@@ -62,7 +62,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     lines.append(f"Most profitable category: {top_cat}.")
     docs.append({"id": "summary_profit_by_category", "text": "\n".join(lines)})
 
-    # ── 4. Profit by Sub-Category (top 10) ────────────────────────────────────
+    # 4. Profit by Sub-Category (top 10)
     sc = df.groupby("sub_category")["profit"].sum().round(2).sort_values(ascending=False)
     lines = ["Top 10 sub-categories by profit (all years):"]
     for sub, profit in sc.head(10).items():
@@ -70,7 +70,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     lines.append(f"Most profitable sub-category: {sc.index[0]}.")
     docs.append({"id": "summary_profit_by_subcategory", "text": "\n".join(lines)})
 
-    # ── 5. Sales & Profit by Year ──────────────────────────────────────────────
+    # 5. Sales and Profit by Year
     yt = df.groupby("year").agg(
         total_sales=("sales", "sum"),
         total_profit=("profit", "sum"),
@@ -84,7 +84,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         )
     docs.append({"id": "summary_annual_totals", "text": "\n".join(lines)})
 
-    # ── 6. Profit by State (top 10 and bottom 10) ────────────────────────────
+    # 6. Profit by State (top 10 and bottom 10)
     st = df.groupby("state")["profit"].sum().round(2).sort_values(ascending=False)
     lines = ["Top 10 states by profit:"]
     for state, profit in st.head(10).items():
@@ -94,14 +94,14 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         lines.append(f"  {state}: ${profit:,.2f}")
     docs.append({"id": "summary_profit_by_state", "text": "\n".join(lines)})
 
-    # ── 7. Top 10 customers by profit ────────────────────────────────────────
+    # 7. Top 10 customers by profit
     cust = df.groupby("customer_name")["profit"].sum().round(2).sort_values(ascending=False)
     lines = ["Top 10 customers by total profit:"]
     for cname, profit in cust.head(10).items():
         lines.append(f"  {cname}: ${profit:,.2f}")
     docs.append({"id": "summary_top_customers", "text": "\n".join(lines)})
 
-    # ── 8. Segment performance ───────────────────────────────────────────────
+    # 8. Segment performance
     seg = df.groupby("segment").agg(
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
@@ -111,14 +111,14 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         lines.append(f"  {segment}: profit=${row['total_profit']:,.2f}, sales=${row['total_sales']:,.2f}")
     docs.append({"id": "summary_by_segment", "text": "\n".join(lines)})
 
-    # ── 9. City-level profit / loss ───────────────────────────────────────────
+    # 9. City-level profit and loss
     city = df.groupby(["city", "state"]).agg(
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
     ).round(2)
     city_sorted = city.sort_values("total_profit")
 
-    # Bottom 15 — cities with most losses
+    # Bottom 15 - cities with most losses
     loss_cities = city_sorted[city_sorted["total_profit"] < 0].head(15)
     worst_city = city_sorted.index[0]  # (city, state) tuple
     lines = ["Cities with the most losses (negative profit):"]
@@ -130,14 +130,14 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     )
     docs.append({"id": "summary_loss_by_city", "text": "\n".join(lines)})
 
-    # Top 15 — most profitable cities
+    # Top 15 - most profitable cities
     top_cities = city.sort_values("total_profit", ascending=False).head(15)
     lines = ["Most profitable cities:"]
     for (cname, state), row in top_cities.iterrows():
         lines.append(f"  {cname}, {state}: profit=${row['total_profit']:,.2f} (sales=${row['total_sales']:,.2f})")
     docs.append({"id": "summary_profit_by_city", "text": "\n".join(lines)})
 
-    # ── 10. Ship mode performance ─────────────────────────────────────────────
+    # 10. Ship mode performance
     ship = df.groupby("ship_mode").agg(
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
@@ -151,7 +151,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         )
     docs.append({"id": "summary_by_ship_mode", "text": "\n".join(lines)})
 
-    # ── 11. Sales by Region per Year ─────────────────────────────────────────
+    # 11. Sales by Region per Year
     ry_sales = df.groupby(["year", "region"])["sales"].sum().round(2).reset_index()
     for yr, grp in ry_sales.groupby("year"):
         top = grp.loc[grp["sales"].idxmax(), "region"]
@@ -161,7 +161,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         lines.append(f"Highest-sales region in {yr}: {top}.")
         docs.append({"id": f"summary_region_sales_{yr}", "text": "\n".join(lines)})
 
-    # ── 12. Sales by State (top 10 + bottom 10) ───────────────────────────────
+    # 12. Sales by State (top 10 and bottom 10)
     st_sales = df.groupby("state")["sales"].sum().round(2).sort_values(ascending=False)
     lines = ["Top 10 states by total sales:"]
     for state, sales in st_sales.head(10).items():
@@ -171,14 +171,14 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         lines.append(f"  {state}: ${sales:,.2f}")
     docs.append({"id": "summary_sales_by_state", "text": "\n".join(lines)})
 
-    # ── 13. Top 10 customers by sales ────────────────────────────────────────
+    # 13. Top 10 customers by sales
     cust_sales = df.groupby("customer_name")["sales"].sum().round(2).sort_values(ascending=False)
     lines = ["Top 10 customers by total sales:"]
     for cname, sales in cust_sales.head(10).items():
         lines.append(f"  {cname}: ${sales:,.2f}")
     docs.append({"id": "summary_top_customers_by_sales", "text": "\n".join(lines)})
 
-    # ── 14. Full sub-category profit (all, including bottom 5) ────────────────
+    # 14. Full sub-category profit (all, including bottom)
     sc_full = df.groupby("sub_category").agg(
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
@@ -190,7 +190,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     lines.append(f"Most profitable sub-category: {sc_full.index[-1]} (${sc_full.iloc[-1]['total_profit']:,.2f}).")
     docs.append({"id": "summary_subcategory_full", "text": "\n".join(lines)})
 
-    # ── 15. Top 5 customers by profit per region ─────────────────────────────
+    # 15. Top 5 customers by profit per region
     for region, rdf in df.groupby("region"):
         rc = rdf.groupby("customer_name")["profit"].sum().round(2).sort_values(ascending=False).head(5)
         lines = [f"Top 5 most profitable customers in {region} region:"]
@@ -198,7 +198,7 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
             lines.append(f"  {cname}: ${profit:,.2f}")
         docs.append({"id": f"summary_top_customers_{region.lower()}", "text": "\n".join(lines)})
 
-    # ── 16. Sub-category year-over-year sales (growth signal) ─────────────────
+    # 16. Sub-category year-over-year sales (growth signal)
     sc_yr = df.groupby(["year", "sub_category"])["sales"].sum().round(2).unstack(fill_value=0)
     lines = ["Sub-category sales by year (for trend analysis):"]
     for sub in sc_yr.columns:
