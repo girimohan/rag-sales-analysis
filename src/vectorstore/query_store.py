@@ -8,8 +8,8 @@ import chromadb
 _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Singletons — created once, reused on every call
-_client: chromadb.PersistentClient | None = None
-_model: SentenceTransformer | None = None
+_client = None
+_model = None
 
 
 def _get_client() -> chromadb.PersistentClient:

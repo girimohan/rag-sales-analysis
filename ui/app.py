@@ -30,19 +30,19 @@ if submitted:
         st.divider()
         st.subheader("Answer")
         try:
-            def token_stream():
-                with requests.post(
-                    "http://localhost:8000/ask/stream",
-                    json={"query": question},
-                    stream=True,
-                    timeout=120,
-                ) as r:
-                    r.raise_for_status()
-                    for chunk in r.iter_content(chunk_size=None, decode_unicode=True):
-                        if chunk:
-                            yield chunk
-
-            st.write_stream(token_stream())
+            placeholder = st.empty()
+            full_response = ""
+            with requests.post(
+                "http://localhost:8000/ask/stream",
+                json={"query": question},
+                stream=True,
+                timeout=120,
+            ) as r:
+                r.raise_for_status()
+                for chunk in r.iter_content(chunk_size=None, decode_unicode=True):
+                    if chunk:
+                        full_response += chunk
+                        placeholder.text(full_response)
         except requests.exceptions.ConnectionError:
             st.error("Cannot reach the backend. Make sure the FastAPI server is running on port 8000.")
         except requests.exceptions.RequestException as e:

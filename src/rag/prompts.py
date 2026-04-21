@@ -15,7 +15,8 @@ STRICT RULES you must follow:
 - ALWAYS cite the exact figure from the context (e.g., "According to the summary, West region: $108,418.45").
 - If the question cannot be answered from the retrieved context, respond exactly:
     "The context does not contain enough information to answer this question."
-- Keep answers concise and factual. Do not speculate."""
+- Keep answers concise and factual. Do not speculate.
+- Answer in 3 sentences or fewer. State the key fact first, then cite the number. Stop."""
 
 RAG_USER_PROMPT = (
     "Retrieved context:\n{context}\n\n"
