@@ -12,6 +12,17 @@ st.markdown(
     "Ask any question about sales, customers, products, or regions "
     "and get an answer based on the Superstore dataset."
 )
+
+with st.sidebar:
+    st.header("Settings")
+    selected_model = st.selectbox(
+        "LLM Model",
+        options=["llama3", "phi3:mini"],
+        index=0,
+        help="llama3 gives more accurate answers; phi3:mini is faster but less reliable.",
+    )
+    st.caption(f"Active: `{selected_model}`")
+
 st.divider()
 
 with st.form(key="question_form"):
@@ -34,7 +45,7 @@ if submitted:
             full_response = ""
             with requests.post(
                 "http://localhost:8000/ask/stream",
-                json={"query": question},
+                json={"query": question, "model": selected_model},
                 stream=True,
                 timeout=120,
             ) as r:
@@ -49,4 +60,4 @@ if submitted:
             st.error(f"Request failed: {e}")
 
 st.divider()
-st.caption("Powered by ChromaDB · SentenceTransformers · Ollama (phi3:mini)")
+st.caption("Powered by ChromaDB · SentenceTransformers · Ollama (llama3 / phi3:mini)")

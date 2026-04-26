@@ -6,3 +6,4 @@ data/raw/*
 data/processed/*
 .ipynb_checkpoints/
 .env
+chroma_db/

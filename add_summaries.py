@@ -231,6 +231,7 @@ def inject_summaries():
         ids=[d["id"] for d in docs],
         documents=[d["text"] for d in docs],
         embeddings=embeddings,
+        metadatas=[{"type": "summary"} for _ in docs],
     )
 
     print(f"Done. Injected {len(docs)} summary documents into '{COLLECTION_NAME}'.")

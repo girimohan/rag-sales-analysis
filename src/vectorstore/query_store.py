@@ -42,3 +42,13 @@ def query_vector_store(query: str, collection_name: str = "superstore", top_k: i
         "distances": results["distances"][0],
     }
 
+
+def get_all_summaries(collection_name: str = "superstore") -> dict:
+    """Return all pre-computed summary documents from ChromaDB."""
+    collection = _get_client().get_collection(name=collection_name)
+    results = collection.get(where={"type": "summary"})
+    return {
+        "documents": results["documents"],
+        "ids": results["ids"],
+    }
+

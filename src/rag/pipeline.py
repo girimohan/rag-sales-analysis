@@ -2,11 +2,12 @@ from functools import lru_cache
 from typing import Iterator, List
 
 import torch
-from src.vectorstore.query_store import query_vector_store
+from src.vectorstore.query_store import query_vector_store, get_all_summaries
 from src.rag.prompts import RAG_SYSTEM_PROMPT, RAG_USER_PROMPT
 import ollama
 
-MODEL = "phi3:mini"
+DEFAULT_MODEL = "llama3"
+AVAILABLE_MODELS = ["llama3", "phi3:mini"]
 GPU_LAYERS = -1 if torch.cuda.is_available() else 0  # -1 = all layers on GPU
 
 # Keywords that indicate an analytical question requiring summary documents
@@ -39,11 +40,25 @@ def build_context(docs: List[str]) -> str:
 
 def _make_messages(query: str, top_k: int) -> list:
     """Build the message list for the LLM from retrieved context."""
-    results = query_vector_store(query, top_k=top_k)
     analytical = is_analytical(query)
-    docs, ids, distances = reorder_docs(
-        results["documents"], results["ids"], results["distances"], analytical
-    )
+    results = query_vector_store(query, top_k=top_k)
+
+    if analytical:
+        # For analytical queries, always fetch ALL summary documents directly so
+        # they are never missed due to embedding-similarity ranking against 10k rows.
+        summary_results = get_all_summaries()
+        summary_ids = set(summary_results["ids"])
+        # Keep only row-level docs from the similarity search
+        row_docs = [
+            d for d, i in zip(results["documents"], results["ids"])
+            if i not in summary_ids
+        ]
+        docs = summary_results["documents"] + row_docs
+    else:
+        docs, ids, distances = reorder_docs(
+            results["documents"], results["ids"], results["distances"], analytical
+        )
+
     context = build_context(docs)
     user_message = RAG_USER_PROMPT.format(context=context, question=query)
     return [
@@ -53,23 +68,23 @@ def _make_messages(query: str, top_k: int) -> list:
 
 
 @lru_cache(maxsize=128)
-def run_rag(query: str, top_k: int = 10) -> str:
+def run_rag(query: str, top_k: int = 20, model: str = DEFAULT_MODEL) -> str:
     """Return a complete answer. Repeated identical queries are served from cache."""
     response = ollama.chat(
-        model=MODEL,
+        model=model,
         messages=_make_messages(query, top_k),
-        options={"num_predict": 256, "num_gpu": GPU_LAYERS},
+        options={"num_predict": 256, "num_gpu": GPU_LAYERS, "temperature": 0},
     )
     return response["message"]["content"]
 
 
-def stream_rag(query: str, top_k: int = 10) -> Iterator[str]:
+def stream_rag(query: str, top_k: int = 20, model: str = DEFAULT_MODEL) -> Iterator[str]:
     """Yield answer tokens one at a time for streaming responses."""
     for chunk in ollama.chat(
-        model=MODEL,
+        model=model,
         messages=_make_messages(query, top_k),
         stream=True,
-        options={"num_gpu": GPU_LAYERS},
+        options={"num_gpu": GPU_LAYERS, "temperature": 0},
     ):
         token = chunk["message"]["content"]
         if token:
