@@ -1,9 +1,9 @@
 # RAG-Based Sales Analysis System
 ## Project Report
 
-**Author:** Mohan Giri
-**Date:** April 2026
-**Repository:** https://github.com/girimohan/rag-sales-analysis
+- **Author:** Mohan Giri, Razib Hasan
+- **Date:** April 2026
+- **Repository:** https://github.com/girimohan/rag-sales-analysis
 
 ---
 
