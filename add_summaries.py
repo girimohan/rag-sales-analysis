@@ -4,9 +4,14 @@ Compute aggregate statistics from the Superstore dataset and inject them
 as summary documents into the existing ChromaDB collection so the RAG
 pipeline can answer analytical/aggregation questions correctly.
 """
+import calendar
+
 import pandas as pd
+import torch
 import chromadb
 from sentence_transformers import SentenceTransformer
+
+_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 from src.data_prep.load_data import load_superstore as load_data
 from src.data_prep.preprocess import clean_columns
@@ -56,15 +61,22 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         total_sales=("sales", "sum"),
     ).round(2)
     top_cat = ca["total_profit"].idxmax()
-    lines = ["Profit and sales by product category (all years):"]
+    lines = [
+        "Profit and sales by TOP-LEVEL PRODUCT CATEGORY (all years).",
+        "There are exactly 3 top-level categories: Furniture, Office Supplies, Technology.",
+        "Do NOT confuse these with sub-categories (e.g. Copiers, Chairs, Binders are sub-categories, not categories).",
+    ]
     for cat, row in ca.sort_values("total_profit", ascending=False).iterrows():
         lines.append(f"  {cat}: profit=${row['total_profit']:,.2f}, sales=${row['total_sales']:,.2f}")
-    lines.append(f"Most profitable category: {top_cat}.")
+    lines.append(f"Most profitable top-level category: {top_cat}.")
     docs.append({"id": "summary_profit_by_category", "text": "\n".join(lines)})
 
     # 4. Profit by Sub-Category (top 10)
     sc = df.groupby("sub_category")["profit"].sum().round(2).sort_values(ascending=False)
-    lines = ["Top 10 sub-categories by profit (all years):"]
+    lines = [
+        "Top 10 PRODUCT SUB-CATEGORIES by profit (all years).",
+        "Sub-categories sit below the 3 top-level categories (Furniture, Office Supplies, Technology).",
+    ]
     for sub, profit in sc.head(10).items():
         lines.append(f"  {sub}: ${profit:,.2f}")
     lines.append(f"Most profitable sub-category: {sc.index[0]}.")
@@ -121,7 +133,10 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
     # Bottom 15 - cities with most losses
     loss_cities = city_sorted[city_sorted["total_profit"] < 0].head(15)
     worst_city = city_sorted.index[0]  # (city, state) tuple
-    lines = ["Cities with the most losses (negative profit):"]
+    lines = [
+        "LOSS CITIES — cities with NEGATIVE profit (money-losing locations):",
+        "Use this document only for questions about losses, negative profit, or worst-performing cities.",
+    ]
     for (cname, state), row in loss_cities.iterrows():
         lines.append(f"  {cname}, {state}: loss=${row['total_profit']:,.2f} (sales=${row['total_sales']:,.2f})")
     lines.append(
@@ -132,7 +147,13 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
 
     # Top 15 - most profitable cities
     top_cities = city.sort_values("total_profit", ascending=False).head(15)
-    lines = ["Most profitable cities:"]
+    best_city = top_cities.index[0]
+    lines = [
+        "PROFIT CITIES — cities with the HIGHEST POSITIVE profit (best-performing locations):",
+        "Use this document only for questions about highest profit, most profitable, or best-performing cities.",
+        f"City with the single highest profit: {best_city[0]}, {best_city[1]} "
+        f"with profit=${top_cities.iloc[0]['total_profit']:,.2f}.",
+    ]
     for (cname, state), row in top_cities.iterrows():
         lines.append(f"  {cname}, {state}: profit=${row['total_profit']:,.2f} (sales=${row['total_sales']:,.2f})")
     docs.append({"id": "summary_profit_by_city", "text": "\n".join(lines)})
@@ -183,7 +204,10 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         total_profit=("profit", "sum"),
         total_sales=("sales", "sum"),
     ).round(2).sort_values("total_profit")
-    lines = ["All sub-categories by profit (lowest to highest):"]
+    lines = [
+        "All PRODUCT SUB-CATEGORIES by profit (lowest to highest).",
+        "Sub-categories are NOT top-level categories. Top-level categories are only: Furniture, Office Supplies, Technology.",
+    ]
     for sub, row in sc_full.iterrows():
         lines.append(f"  {sub}: profit=${row['total_profit']:,.2f}, sales=${row['total_sales']:,.2f}")
     lines.append(f"Least profitable sub-category: {sc_full.index[0]} (${sc_full.iloc[0]['total_profit']:,.2f}).")
@@ -206,6 +230,121 @@ def build_summary_docs(df: pd.DataFrame) -> list[dict]:
         lines.append(f"  {sub}: {row_vals}")
     docs.append({"id": "summary_subcategory_sales_by_year", "text": "\n".join(lines)})
 
+    # 17. Monthly seasonality
+    monthly = df.groupby(df["order_date"].dt.month).agg(
+        total_sales=("sales", "sum"),
+        total_orders=("order_id", "nunique"),
+    ).round(2)
+    peak_month = int(monthly["total_sales"].idxmax())
+    lines = ["Monthly sales totals (all years combined, to detect seasonality):"]
+    for month_num, row in monthly.sort_values("total_sales", ascending=False).iterrows():
+        lines.append(
+            f"  {calendar.month_name[int(month_num)]}: "
+            f"total_sales=${row['total_sales']:,.2f}, orders={row['total_orders']}"
+        )
+    lines.append(f"Peak sales month overall: {calendar.month_name[peak_month]}.")
+    lines.append(
+        "Sales are highest in Q4 (November, December) and September, indicating clear year-end seasonality."
+    )
+    docs.append({"id": "summary_monthly_sales", "text": "\n".join(lines)})
+
+    # 18. Profit margin by year
+    yt_m = df.groupby("year").agg(
+        total_profit=("profit", "sum"),
+        total_sales=("sales", "sum"),
+    ).round(2)
+    yt_m["margin_pct"] = (yt_m["total_profit"] / yt_m["total_sales"] * 100).round(2)
+    lines = ["Profit margin by year (margin % = profit / sales * 100):"]
+    for yr, row in yt_m.iterrows():
+        lines.append(
+            f"  {yr}: profit=${row['total_profit']:,.2f}, "
+            f"sales=${row['total_sales']:,.2f}, margin={row['margin_pct']}%"
+        )
+    best_yr = yt_m["margin_pct"].idxmax()
+    lines.append(f"Highest profit margin year: {best_yr} ({yt_m.loc[best_yr, 'margin_pct']}%).")
+    docs.append({"id": "summary_profit_margin_by_year", "text": "\n".join(lines)})
+
+    # 19. Profit margin by category
+    cat_m = df.groupby("category").agg(
+        total_profit=("profit", "sum"),
+        total_sales=("sales", "sum"),
+    ).round(2)
+    cat_m["margin_pct"] = (cat_m["total_profit"] / cat_m["total_sales"] * 100).round(2)
+    lines = ["Profit margin by product category (margin % = profit / sales * 100):"]
+    for cat, row in cat_m.sort_values("margin_pct", ascending=False).iterrows():
+        lines.append(
+            f"  {cat}: margin={row['margin_pct']}%, "
+            f"profit=${row['total_profit']:,.2f}, sales=${row['total_sales']:,.2f}"
+        )
+    best_cat = cat_m["margin_pct"].idxmax()
+    lines.append(f"Highest margin category: {best_cat} ({cat_m.loc[best_cat, 'margin_pct']}%).")
+    docs.append({"id": "summary_profit_margin_by_category", "text": "\n".join(lines)})
+
+    # 20. Sub-category profit margin and discount rates
+    sc_m = df.groupby("sub_category").agg(
+        total_profit=("profit", "sum"),
+        total_sales=("sales", "sum"),
+        avg_discount=("discount", "mean"),
+    ).round(4)
+    sc_m["margin_pct"] = (sc_m["total_profit"] / sc_m["total_sales"] * 100).round(2)
+    sc_m["avg_discount_pct"] = (sc_m["avg_discount"] * 100).round(1)
+    lines = ["Sub-category profit margin and average discount (all years):"]
+    for sub, row in sc_m.sort_values("margin_pct", ascending=False).iterrows():
+        lines.append(
+            f"  {sub}: margin={row['margin_pct']}%, "
+            f"avg_discount={row['avg_discount_pct']}%, "
+            f"profit=${row['total_profit']:,.2f}"
+        )
+    most_discounted = sc_m["avg_discount_pct"].idxmax()
+    least_margin = sc_m["margin_pct"].idxmin()
+    lines.append(f"Sub-category with highest average discount: {most_discounted} ({sc_m.loc[most_discounted, 'avg_discount_pct']}%).")
+    lines.append(f"Sub-category with lowest profit margin: {least_margin} ({sc_m.loc[least_margin, 'margin_pct']}%).")
+    docs.append({"id": "summary_subcategory_margin_discount", "text": "\n".join(lines)})
+
+    # 21. Technology vs Furniture detailed comparison
+    tech_df = df[df["category"] == "Technology"]
+    furn_df = df[df["category"] == "Furniture"]
+    tech_profit = round(tech_df["profit"].sum(), 2)
+    furn_profit = round(furn_df["profit"].sum(), 2)
+    tech_sales = round(tech_df["sales"].sum(), 2)
+    furn_sales = round(furn_df["sales"].sum(), 2)
+    tech_margin = round(tech_profit / tech_sales * 100, 2)
+    furn_margin = round(furn_profit / furn_sales * 100, 2)
+    winner = "Technology" if tech_profit > furn_profit else "Furniture"
+    lines = [
+        "Technology vs Furniture comparison (all years 2014-2017):",
+        f"  Technology: profit=${tech_profit:,.2f}, sales=${tech_sales:,.2f}, margin={tech_margin}%",
+        f"  Furniture:  profit=${furn_profit:,.2f}, sales=${furn_sales:,.2f}, margin={furn_margin}%",
+        f"More profitable category: {winner}.",
+        "Year-by-year sales breakdown:",
+    ]
+    for yr in sorted(df["year"].dropna().unique()):
+        t = round(df[(df["year"] == yr) & (df["category"] == "Technology")]["sales"].sum(), 2)
+        f_ = round(df[(df["year"] == yr) & (df["category"] == "Furniture")]["sales"].sum(), 2)
+        lines.append(f"  {int(yr)}: Technology=${t:,.2f}, Furniture=${f_:,.2f}")
+    docs.append({"id": "summary_tech_vs_furniture", "text": "\n".join(lines)})
+
+    # 22. West vs East profit comparison
+    west_df = df[df["region"] == "West"]
+    east_df = df[df["region"] == "East"]
+    west_profit = round(west_df["profit"].sum(), 2)
+    east_profit = round(east_df["profit"].sum(), 2)
+    west_sales = round(west_df["sales"].sum(), 2)
+    east_sales = round(east_df["sales"].sum(), 2)
+    region_winner = "West" if west_profit > east_profit else "East"
+    lines = [
+        "West vs East region profit comparison (all years 2014-2017):",
+        f"  West: profit=${west_profit:,.2f}, sales=${west_sales:,.2f}",
+        f"  East: profit=${east_profit:,.2f}, sales=${east_sales:,.2f}",
+        f"Higher profit region: {region_winner}.",
+        "Year-by-year profit breakdown:",
+    ]
+    for yr in sorted(df["year"].dropna().unique()):
+        wp = round(df[(df["year"] == yr) & (df["region"] == "West")]["profit"].sum(), 2)
+        ep = round(df[(df["year"] == yr) & (df["region"] == "East")]["profit"].sum(), 2)
+        lines.append(f"  {int(yr)}: West=${wp:,.2f}, East=${ep:,.2f}")
+    docs.append({"id": "summary_west_vs_east", "text": "\n".join(lines)})
+
     return docs
 
 
@@ -223,7 +362,7 @@ def inject_summaries():
     collection = client.get_collection(name=COLLECTION_NAME)
 
     print("Embedding summaries...")
-    model = SentenceTransformer("all-MiniLM-L6-v2", device="cuda")
+    model = SentenceTransformer("all-MiniLM-L6-v2", device=_DEVICE)
     embeddings = model.encode([d["text"] for d in docs], show_progress_bar=True).tolist()
 
     # Upsert so re-running is idempotent

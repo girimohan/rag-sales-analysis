@@ -7,3 +7,5 @@ data/processed/*
 .ipynb_checkpoints/
 .env
 chroma_db/
+.DS_Store
+**/.DS_Store

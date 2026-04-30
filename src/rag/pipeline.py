@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Iterator, List
 
 import torch
-from src.vectorstore.query_store import query_vector_store, get_all_summaries
+from src.vectorstore.query_store import query_vector_store, get_relevant_summaries
 from src.rag.prompts import RAG_SYSTEM_PROMPT, RAG_USER_PROMPT
 import ollama
 
@@ -41,21 +41,15 @@ def build_context(docs: List[str]) -> str:
 def _make_messages(query: str, top_k: int) -> list:
     """Build the message list for the LLM from retrieved context."""
     analytical = is_analytical(query)
-    results = query_vector_store(query, top_k=top_k)
 
     if analytical:
-        # For analytical queries, always fetch ALL summary documents directly so
-        # they are never missed due to embedding-similarity ranking against 10k rows.
-        summary_results = get_all_summaries()
-        summary_ids = set(summary_results["ids"])
-        # Keep only row-level docs from the similarity search
-        row_docs = [
-            d for d, i in zip(results["documents"], results["ids"])
-            if i not in summary_ids
-        ]
-        docs = summary_results["documents"] + row_docs
+        # For analytical queries, retrieve the most relevant summary documents.
+        # Using semantic selection (top 10 of 32) prevents the LLM from being
+        # confused by unrelated summaries (e.g. loss cities vs profit cities).
+        docs = get_relevant_summaries(query, top_k=10)
     else:
-        docs, ids, distances = reorder_docs(
+        results = query_vector_store(query, top_k=top_k)
+        docs, _, _ = reorder_docs(
             results["documents"], results["ids"], results["distances"], analytical
         )
 

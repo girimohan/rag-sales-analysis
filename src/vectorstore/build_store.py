@@ -1,7 +1,10 @@
 from typing import List
 
+import torch
 from sentence_transformers import SentenceTransformer
 import chromadb
+
+_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def build_vector_store(chunks: List[str], collection_name: str = "superstore"):
@@ -14,7 +17,7 @@ def build_vector_store(chunks: List[str], collection_name: str = "superstore"):
     client = chromadb.PersistentClient(path="chroma_db")
     collection = client.get_or_create_collection(name=collection_name)
 
-    model = SentenceTransformer("all-MiniLM-L6-v2", device="cuda")
+    model = SentenceTransformer("all-MiniLM-L6-v2", device=_DEVICE)
     embeddings = model.encode(chunks, show_progress_bar=True).tolist()
     ids = [f"chunk_{i}" for i in range(len(chunks))]
     metadatas = [{"text": chunk} for chunk in chunks]
